@@ -1,35 +1,88 @@
 from __future__ import annotations
+from pathlib import Path
+from typing import Annotated, Any, Sequence
+import yaml
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 
 
-def config_domain(min_space: float, max_space: float, nx: int, min_time: float, max_time: float, nt: int) -> tuple[jax.Array, jax.Array]:
+def load_config(
+        path: str | Path
+        ) -> dict[str, Any]:
+    """
+    load YAML configuration file into Python configuration object
+
+    parameters
+    ----------
+    path
+        path to the YAML configuration file
+
+    returns
+    -------
+    config
+        nested configuration object containing experiment, space, time, pde, initial_condition, boundary_condition, solver, dataset, model, training, evaluation, and logging settings
+    """
+    with open(path, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+def build_domain(
+        config: dict[str, Any]
+        ) -> tuple[
+            Annotated[jax.Array, "(nx,)"],
+            Annotated[jax.Array, "(nt,)"]
+            ]:
     """
     configure spatiotemporal domain
 
     parameters
     ----------
-    min_space: float
-        minimum spatial coordinate
-    max_space: float
-        maximum spatial coordinate
-    nx: int
-        number of spatial coordinates
-    min_time: float
-        minimum temporal coordinate
-    max_time: float
-        maximum temporal coordinate
-    nt: int
-        number of temporal coordinates
+    config
+        nested configuration object containing experiment, space, time, pde, initial_condition, boundary_condition, solver, dataset, model, training, evaluation, and logging settings
+    
+    returns
+    -------
+    x
+        spatial coordinates
+    t
+        temporal coordinates
     """
-    x = jnp.linspace(min_space, max_space, nx, endpoint=False)
-    t = jnp.linspace(min_time, max_time, nt, endpoint=True)
+    # spatial domain
+    # TODO: convert from 1d x to nd R
+    # dim = config["space"]["dimension"]
+    # axis = list(config["space"]["axis"].keys())
+    # R = dict()
+    # for i in range(dim):
+    #     ax = axis[i]
+    #     min = config["space"]["axis"][ax]["min"]
+    #     max = config["space"]["axis"][ax]["max"]
+    #     n = config["space"]["axis"][ax]["n"]
+    #     periodic = config["space"]["axis"][ax]["periodic"]
+    #     R[ax] = jnp.linspace(min, max, n, endpoint=periodic)
+    min = config["space"]["axis"]["x"]["min"]
+    max = config["space"]["axis"]["x"]["max"]
+    n = config["space"]["axis"]["x"]["n"]
+    periodic = config["space"]["axis"]["x"]["periodic"]
+    x = jnp.linspace(min, max, n, endpoint=not periodic)
+
+    # temporal domain
+    min = config["time"]["min"]
+    max = config["time"]["max"]
+    n = config["time"]["n"]
+    t = jnp.linspace(min, max, n)
     return x, t
 
 
-def covariance(x: jax.Array, *, sigma: float = 1.0, ell: float = 1.0, eps=1e-5) -> jax.Array:
+def covariance(
+    x: Annotated[jax.Array, "(nx,)"],
+    *,
+    sigma: float = 1.0,
+    ell: float = 1.0,
+    eps: float = 1e-5,
+) -> Annotated[jax.Array, "(nx, nx)"]:
     """
     compute the covariance between u(x_i) and u(x_j)
     symmetric: K = K^T
@@ -37,18 +90,18 @@ def covariance(x: jax.Array, *, sigma: float = 1.0, ell: float = 1.0, eps=1e-5) 
 
     parameters
     ----------
-    x: jax.Array
-        spatial coordinates
-    sigma: float
+    x
+        spatial coordinate array
+    sigma
         standard deviation
-    ell: float
+    ell
         speed of correlation decay
-    eps: float
+    eps
         safety factor for numerical stability
 
     returns
     -------
-    L: jax.Array
+    L
         lower triangular covariance matrix
     """
     distance = x[:, None] - x[None, :]
@@ -68,24 +121,30 @@ def covariance(x: jax.Array, *, sigma: float = 1.0, ell: float = 1.0, eps=1e-5) 
     return L
 
 
-def initialize(x: jax.Array, L: jax.Array, key: jax.Array, *, n: int) -> jax.Array:
+def initialize(
+    x: Annotated[jax.Array, "(nx,)"],
+    L: Annotated[jax.Array, "(nx, nx)"],
+    key: Annotated[jax.Array, "() | (2,)"],
+    *,
+    n: int,
+) -> Annotated[jax.Array, "(n, nx)"]:
     """
     generate initial conditions
 
     parameters
     ----------
-    x: jax.Array
-        spatial coordinates
-    L: jax.Array
+    x
+        spatial coordinate array
+    L
         lower triangular covariance matrix
-    key: jax.Array
+    key
         random number generator
-    n: int
+    n
         number of initial conditions
     
     returns
     -------
-    u_0: jax.Array
+    u_0
         initial conditions
     """
     nx = len(x)
@@ -98,125 +157,154 @@ def initialize(x: jax.Array, L: jax.Array, key: jax.Array, *, n: int) -> jax.Arr
     return u_0
 
 
-def sample_coeff(domain: list, key: jax.Array, *, n: int) -> jax.Array:
+def sample_coeff(
+    domain: Annotated[Sequence[float], "(2,)"],
+    key: Annotated[jax.Array, "() | (2,)"],
+    *,
+    n: int,
+) -> Annotated[jax.Array, "(n,)"]:
     """
     sample coefficients from uniform probability distribution
 
     parameters
     ----------
-    domain: list
+    domain
         minimum and maximum value of coefficients
-    key: jax.Array
+    key
         random number generator
-    n: int
+    n
         number of coefficients
     
     returns
     -------
-    jax.Array
+    coeffs
         coefficients
     """
     return jr.uniform(key, (n,), minval=domain[0], maxval=domain[1])
 
 
-def flux(u: jax.Array, coeffs: jax.Array) -> jax.Array:
+def flux(
+    u: Annotated[jax.Array, "() | (nx,)"],
+    coeffs: Annotated[jax.Array, "(3,)"],
+) -> Annotated[jax.Array, "() | (nx,)"]:
     """
     compute flux
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    coeffs: jax.Array
+    coeffs
         coefficients
 
     returns
     -------
-    jax.Array
+    f
         flux
     """
     return coeffs[0] * u ** 3 + coeffs[1] * u ** 2 + coeffs[2] * u
 
 
-def speed(u: jax.Array, coeffs: jax.Array) -> jax.Array:
+def speed(
+    u: Annotated[jax.Array, "() | (nx,)"],
+    coeffs: Annotated[jax.Array, "(3,)"],
+) -> Annotated[jax.Array, "() | (nx,)"]:
     """
     compute speed
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    coeffs: jax.Array
+    coeffs
         coefficients
     
     returns
     ------
-    jax.Array
+    speed
         speed
     """
     J = jax.jacrev(lambda value: flux(value, coeffs))(u)
     return jnp.abs(J)
 
 
-def max_speed(speed: jax.Array, *, eps: float = 1e-8) -> jax.Array:
+def max_speed(
+    speed: Annotated[jax.Array, "() | (nx,)"],
+    *,
+    eps: float = 1e-8,
+) -> Annotated[jax.Array, "()"]:
     """
     compute max speed
 
     parameters
     ----------
-    speed: jax.Array
+    speed
         rate of change of position
-    eps: float
+    eps
         safety factor for numerical stability
     
     returns
     ------
-    jax.Array
+    max_speed
         maximum rate of change of position
     """
     max_speed = jnp.max(speed)
     return jnp.maximum(max_speed, eps)
 
 
-def time_step(x: jax.Array, dx: float, max_speed: jax.Array, *, cfl: float = 0.5) -> jax.Array:
+def time_step(
+    x: Annotated[jax.Array, "(nx,)"],
+    dx: float,
+    max_speed: Annotated[jax.Array, "()"],
+    *,
+    cfl: float = 0.5,
+) -> Annotated[jax.Array, "()"]:
     """
     compute time step
 
     parameters
     ----------
-    max_speed: jax.Array
+    max_speed
         maximum rate of change of position
-    dx: float
+    dx
         grid spacing
-    cfl: float
+    cfl
         safety factor for limiting the size of time step (courant-friedrachs-lewy)
     
     returns
     ------
-    jax.Array
+    dt
         time step
     """
     return cfl * dx / max_speed
 
 
-def neighbor(u: jax.Array, *, i: int, n: int) -> tuple[jax.Array, jax.Array]:
+def neighbor(
+    u: Annotated[jax.Array, "(nx,)"],
+    *,
+    i: int,
+    n: int,
+) -> tuple[
+    Annotated[jax.Array, "()"],
+    Annotated[jax.Array, "()"],
+]:
     """
     compute solution at neighboring spatial coordinate
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    i: int
+    i
         index of center solution
-    n: int
+    n
         number of neighbors
     
     returns
     ------
-    before_sol: float
+    before_sol
         solution before center solution
-    after_sol: float
+    after_sol
         solution after center solution
     """
     before_index = (i - n) % len(u)
@@ -226,20 +314,23 @@ def neighbor(u: jax.Array, *, i: int, n: int) -> tuple[jax.Array, jax.Array]:
     return before_sol, after_sol
 
 
-def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
+def numerical_flux(
+    u: Annotated[jax.Array, "(nx,)"],
+    coeffs: Annotated[jax.Array, "(3,)"],
+) -> Annotated[jax.Array, "(nx,)"]:
     """
     compute numerical flux
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    coeffs: list
+    coeffs
         coefficients
 
     returns
     -------
-    num_flux: jax.Array
+    num_flux
         numerical flux
     """
     ORDER = 5  # 5th order WENO
@@ -248,9 +339,18 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
     num_flux = np.empty(u.shape)
     for i in range(len(u)):
 
-        def create_stencil(u: jax.Array, *, i: int, side: str) -> tuple[jax.Array, jax.Array, jax.Array]:
+        def create_stencil(
+            u: Annotated[jax.Array, "(nx,)"],
+            *,
+            i: int,
+            side: str,
+        ) -> tuple[
+            Annotated[jax.Array, "(3,)"],
+            Annotated[jax.Array, "(3,)"],
+            Annotated[jax.Array, "(3,)"],
+        ]:
             """
-            choose spatial coordinates for approximating solution at cell interface \\
+            choose spatial stencil for approximating solution at cell interface \\
             left = {i-2, i-1, i, i+1, i+2} \\
             right = {i+3, i+2, i+1, i, i-1}
             """
@@ -271,7 +371,15 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
         left_s0, left_s1, left_s2 = create_stencil(u, i=i, side="left")
         right_s0, right_s1, right_s2 = create_stencil(u, i=i, side="right")
 
-        def smooth_stencil(s0: jax.Array, s1: jax.Array, s2: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+        def smooth_stencil(
+            s0: Annotated[jax.Array, "(3,)"],
+            s1: Annotated[jax.Array, "(3,)"],
+            s2: Annotated[jax.Array, "(3,)"],
+        ) -> tuple[
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+        ]:
             """
             compute smoothness of stencil
             """
@@ -290,8 +398,16 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
         right_beta0, right_beta1, right_beta2 = smooth_stencil(right_s0, right_s1, right_s2)
 
         def weight_stencil(
-            beta0: jax.Array, beta1: jax.Array, beta2: jax.Array, *, eps: float = 1e-6
-        ) -> tuple[jax.Array, jax.Array, jax.Array]:
+            beta0: Annotated[jax.Array, "()"],
+            beta1: Annotated[jax.Array, "()"],
+            beta2: Annotated[jax.Array, "()"],
+            *,
+            eps: float = 1e-6,
+        ) -> tuple[
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+        ]:
             """
             if smooth stencil then large weight \\
             if rough stencil then small weight
@@ -305,8 +421,14 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
         right_alpha0, right_alpha1, right_alpha2 = weight_stencil(right_beta0, right_beta1, right_beta2)
 
         def norm_weight(
-            alpha0: jax.Array, alpha1: jax.Array, alpha2: jax.Array
-        ) -> tuple[jax.Array, jax.Array, jax.Array]:
+            alpha0: Annotated[jax.Array, "()"],
+            alpha1: Annotated[jax.Array, "()"],
+            alpha2: Annotated[jax.Array, "()"],
+        ) -> tuple[
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+        ]:
             """
             normalize stencil weight
             """
@@ -321,8 +443,14 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
         )
 
         def approx_sol(
-            s0: jax.Array, s1: jax.Array, s2: jax.Array
-        ) -> tuple[jax.Array, jax.Array, jax.Array]:
+            s0: Annotated[jax.Array, "(3,)"],
+            s1: Annotated[jax.Array, "(3,)"],
+            s2: Annotated[jax.Array, "(3,)"],
+        ) -> tuple[
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"],
+        ]:
             """
             approximate solution at cell interface using Lagrange interpolation \\
             q \\approx u(x_{i+0.5})
@@ -358,21 +486,24 @@ def numerical_flux(u: jax.Array, coeffs) -> jax.Array:
     return jnp.array(num_flux)
 
 
-def rhs(num_flux: jax.Array, dx: float) -> jax.Array:
+def rhs(
+    num_flux: Annotated[jax.Array, "(nx,)"],
+    dx: float,
+) -> Annotated[jax.Array, "(nx,)"]:
     """
     compute right hand side of equation \\
     du/dt = -df(u)/dx
 
     parameters
     ----------
-    num_flux: jax.Array
+    num_flux
         numerical flux
-    dx: float
+    dx
         grid spacing
     
     returns
     -------
-    jax.Array
+    rhs
         rhs of 1d conservation law
     """
     dfdx = np.empty(num_flux.shape)
@@ -381,22 +512,26 @@ def rhs(num_flux: jax.Array, dx: float) -> jax.Array:
     return jnp.array(dfdx)
 
 
-def rk4_step(u: jax.Array, dx: float, dt: float) -> jax.Array:
+def rk4_step(
+    u: Annotated[jax.Array, "(nx,)"],
+    dx: float,
+    dt: float,
+) -> Annotated[jax.Array, "(nx,)"]:
     """
     approximate solution at next time step using 4th order runge-kutta
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    dx: float
+    dx
         grid spacing
-    dt: float
+    dt
         time step
 
     returns
     -------
-    u_dt: jax.Array
+    u_dt
         solution differential between time step
     """
     k1 = rhs(u, dx)
@@ -407,27 +542,33 @@ def rk4_step(u: jax.Array, dx: float, dt: float) -> jax.Array:
     return u_dt
 
 
-def rk4_evolve(u: jax.Array, dx: float, dt: float) -> jax.Array:
+def rk4_evolve(
+    u: Annotated[jax.Array, "(nx,)"],
+    t: Annotated[jax.Array, "(nt,)"],
+    dx: float,
+    dt: float,
+) -> Annotated[jax.Array, "(nt, nx)"]:
     """
     evolve approximate solution through time using repeated RK4 steps
 
     parameters
     ----------
-    u: jax.Array
+    u
         solution
-    dx: float
+    t
+        temporal coordinates
+    dx
         grid spacing
-    dt: float
+    dt
         time step
 
     returns
     -------
-    trajs: jax.Array
+    trajs
         solution trajectories
     """
-    min_time = 0 # TODO: parameterize min_time
-    max_time = 0.5 # TODO: parameterize max_time
-    t = min_time 
+    t = t[0]
+    max_time = t[-1]
     trajs = list()
     while t < max_time:
         trajs.append(u)
@@ -438,20 +579,24 @@ def rk4_evolve(u: jax.Array, dx: float, dt: float) -> jax.Array:
     return trajs
 
 
-def demonstrate(trajs: jax.Array, *, n: int) -> jax.Array:
+def demonstrate(
+    trajs: Annotated[jax.Array, "(nt, nx)"],
+    *,
+    n: int,
+) -> Annotated[jax.Array, "(num_examples, 2, nx)"]:
     """
     create (input, target) examples
 
     parameters
     ----------
-    trajs: jax.Array
+    trajs
         solution trajectories
-    n: int
+    n
         number of time steps
     
     returns
     -------
-    examples: jax.Array
+    examples
         input-target examples
     """
     num_exs = len(trajs) - n
@@ -465,7 +610,7 @@ def demonstrate(trajs: jax.Array, *, n: int) -> jax.Array:
     return examples
 
 
-def main():
+def main() -> None:
     pass
 
 

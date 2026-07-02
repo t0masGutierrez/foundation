@@ -13,23 +13,23 @@ experiment:
 # SPATIAL DOMAIN
 # ============================================================================
 
-domain:
+space:
   dimension: 1
   axis:
     x:
-      min: 0.0
+      min: -1.0
       max: 1.0
-      nx: 100
+      n: 100
       periodic: true
     y:
       min: null
       max: null
-      nx: null
+      n: null
       periodic: null
     z:
       min: null
       max: null
-      nx: null
+      n: null
       periodic: null
 
 # ============================================================================
@@ -39,7 +39,7 @@ domain:
 time:
   min: 0.0
   max: 0.5
-  nt: 1001
+  n: 1001
   save_every: 1
 
 # ============================================================================

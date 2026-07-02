@@ -1,0 +1,11 @@
+| Component                    | Action                          | Examples                                  |
+| ---------------------------- | ------------------------------- | ----------------------------------------- |
+| Advection                    | transport / wave propagation    | linear advection, Burgers                 |
+| Diffusion                    | smoothing / dissipation         | heat equation                             |
+| Reaction                     | local growth/decay/nonlinearity | Fisher-KPP, Allen-Cahn                    |
+| Dispersion                   | oscillatory spreading           | KdV, Schrodinger                          |
+| Conservation                 | shocks / weak solutions         | scalar conservation laws, Euler           |
+| Pressure / incompressibility | global constraints              | Navier-Stokes, Stokes                     |
+| Forcing                      | driven systems                  | forced Burgers, forced Navier-Stokes      |
+| Heterogeneous coefficients   | spatially varying media         | Darcy, variable-coefficient diffusion     |
+| Coupled fields               | multi-variable interactions     | reaction-diffusion systems, shallow water |

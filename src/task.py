@@ -1,10 +1,19 @@
 from __future__ import annotations
+from typing import Annotated, Any
 import jax
 import jax.numpy as jnp
 import jax.random as jr
 
 
-def sample_task(examples: jax.Array, key: jax.Array, *, k: int) -> tuple[jax.Array, jax.Array]:
+def sample_task(
+        examples: Annotated[jax.Array, "(num_examples, 2, nx)"],
+        key: Annotated[jax.Array, "() | (2,)"],
+        *,
+        k: int,
+        ) -> tuple[
+            Annotated[jax.Array, "(k, 2, nx)"],
+            Annotated[jax.Array, "(2, nx)"]
+            ]:
     """
     sample task from examples \\
     task{ \\
@@ -14,18 +23,18 @@ def sample_task(examples: jax.Array, key: jax.Array, *, k: int) -> tuple[jax.Arr
 
     parameters
     ----------
-    examples: jax.Array
+    examples
         input-target examples
-    key: jax.Array
+    key
         random number generator
-    k: int
+    k
         number of context examples
 
     returns
     -------
-    context: jax.Array
+    context
         input-target examples
-    query: jax.Array
+    query
         held-out input-target example
     """
     # TODO: parameterize the number of query examples
@@ -35,24 +44,31 @@ def sample_task(examples: jax.Array, key: jax.Array, *, k: int) -> tuple[jax.Arr
     return context, query
 
 
-def tokenize(x: jax.Array, context: jax.Array, query: jax.Array) -> tuple[jax.Array, jax.Array]:
+def tokenize(
+        x: Annotated[jax.Array, "(nx,)"],
+        context: Annotated[jax.Array, "(k, 2, nx)"],
+        query: Annotated[jax.Array, "(2, nx)"],
+        ) -> tuple[
+            Annotated[jax.Array, "(num_input_tokens, token_dim)"],
+            Annotated[jax.Array, "(num_target_tokens, token_dim)"]
+            ]:
     """
     convert function values into sequence values
 
     parameters
     ----------
-    x: jax.Array
+    x
         spatial coordinates
-    context: jax.Array
+    context
         input-target examples
-    query: jax.Array
+    query
         held-out input-target example
 
     returns
     -------
-    input_tokens: jax.Array
+    input_tokens
         sequence of tokenized input function values
-    target_tokens: jax.Array
+    target_tokens
         sequence of tokenized target function values
     """
     input_tokens = list()
@@ -85,29 +101,37 @@ def tokenize(x: jax.Array, context: jax.Array, query: jax.Array) -> tuple[jax.Ar
 
 
 def batch_task(
-    x: jax.Array, examples: jax.Array, key: jax.Array, *, n: int, k: int
-) -> tuple[jax.Array, jax.Array]:
+        x: Annotated[jax.Array, "(nx,)"],
+        examples: Annotated[jax.Array, "(num_examples, 2, nx)"],
+        key: Annotated[jax.Array, "() | (2,)"],
+        *,
+        n: int,
+        k: int,
+        ) -> tuple[
+            Annotated[jax.Array, "(n, num_input_tokens, token_dim)"],
+            Annotated[jax.Array, "(n, num_target_tokens, token_dim)"]
+            ]:
     """
-    create batch of sampled tasks
+    create batch of tokenized tasks
 
     parameters
     ----------
-    x: jax.Array
+    x
         spatial coordinates
-    examples: jax.Array
+    examples
         input-target examples
-    key: jax.Array
+    key
         random number generator
-    n: int
+    n
         number of sampled tasks
-    k: int
+    k
         number of context examples
 
     returns
     -------
-    input_batch: jax.Array
+    input_batch
         sampled input tasks
-    target_batch: jax.Array
+    target_batch
         sampled target tasks
     """
     input_batch = list()
@@ -122,7 +146,42 @@ def batch_task(
     target_batch = jnp.array(target_batch)
     return input_batch, target_batch
 
-def main():
+
+def valid_task(
+        input_batch: Annotated[jax.Array, "(n, num_input_tokens, token_dim)"],
+        target_batch: Annotated[jax.Array, "(n, num_target_tokens, token_dim)"],
+        *,
+        k: int,
+        nx: int
+        ) -> tuple[
+            bool,
+            dict[str, Any],
+            ]:
+    """
+    validate batch of tokenized tasks
+
+    parameters
+    ----------
+    input_batch:
+        sampled input tasks
+    target_batch:
+        sampled target tasks
+    k:
+        number of context examples
+    nx:
+        number of spatial coordinates
+
+    returns
+    -------
+    is_valid:
+        boolean indicating whether the batch is valid or not
+    report:
+        validation summary
+    """
+    return None
+
+
+def main() -> None:
     pass
 
 if __name__ == "__main__":
