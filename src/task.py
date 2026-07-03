@@ -1,8 +1,11 @@
 from __future__ import annotations
-from typing import Annotated, Any
+from typing import Annotated, Any, Tuple
 import jax
 import jax.numpy as jnp
 import jax.random as jr
+from pathlib import Path
+import json
+import numpy as np
 
 
 def sample_task(
@@ -49,8 +52,8 @@ def tokenize(
         context: Annotated[jax.Array, "(k, 2, nx)"],
         query: Annotated[jax.Array, "(2, nx)"],
         ) -> tuple[
-            Annotated[jax.Array, "(num_input_tokens, token_dim)"],
-            Annotated[jax.Array, "(num_target_tokens, token_dim)"]
+            Annotated[jax.Array, "(num_input_tokens, 3)"],
+            Annotated[jax.Array, "(num_target_tokens, 3)"]
             ]:
     """
     convert function values into sequence values
@@ -108,8 +111,8 @@ def batch_task(
         n: int,
         k: int,
         ) -> tuple[
-            Annotated[jax.Array, "(n, num_input_tokens, token_dim)"],
-            Annotated[jax.Array, "(n, num_target_tokens, token_dim)"]
+            Annotated[jax.Array, "(num_tasks, num_input_tokens, 3)"],
+            Annotated[jax.Array, "(num_tasks, num_target_tokens, 3)"]
             ]:
     """
     create batch of tokenized tasks
@@ -147,38 +150,70 @@ def batch_task(
     return input_batch, target_batch
 
 
-def valid_task(
-        input_batch: Annotated[jax.Array, "(n, num_input_tokens, token_dim)"],
-        target_batch: Annotated[jax.Array, "(n, num_target_tokens, token_dim)"],
-        *,
-        k: int,
-        nx: int
-        ) -> tuple[
-            bool,
-            dict[str, Any],
-            ]:
+def save_task(
+        path: str | Path,
+        input_batch: Annotated[jax.Array, "(num_tasks, num_input_tokens, 3)"],
+        target_batch: Annotated[jax.Array, "(num_tasks, num_target_tokens, 3)"],
+        metadata: dict[str, Any]
+        ) -> str | Path:
     """
-    validate batch of tokenized tasks
+    save batch of tokenized tasks to disk
 
     parameters
     ----------
-    input_batch:
-        sampled input tasks
-    target_batch:
-        sampled target tasks
-    k:
-        number of context examples
-    nx:
-        number of spatial coordinates
+    path
+        path to the saved dataset file
+    input_batch
+        batch of visible input tokens containing context inputs, context targets, and query inputs
+    target_batch
+        batch of hidden query target tokens
+    metadata
+        dataset information
 
     returns
     -------
-    is_valid:
-        boolean indicating whether the batch is valid or not
-    report:
-        validation summary
+    path
+        path to the saved dataset file
     """
-    return None
+    metadata_json = json.dumps(metadata)
+    metadata_np = np.array(metadata_json)
+    np.savez(path,
+             input_batch=input_batch,
+             target_batch=target_batch,
+             metadata=metadata_np)
+    return path
+
+def load_task(
+        path: str | Path
+        ) -> Tuple[
+            Annotated[jax.Array, "(num_tasks, num_input_tokens, 3)"],
+            Annotated[jax.Array, "(num_tasks, num_target_tokens, 3)"],
+            dict[str, Any]
+            ]:
+    """
+    load batch of tokenized tasks from disk
+
+    parameters
+    ----------
+    path
+        path to the saved dataset file
+
+    returns
+    -------
+    input_batch
+        batch of visible input tokens containing context inputs, context targets, and query inputs
+    target_batch
+        batch of hidden query target tokens
+    metadata
+        dataset information
+    """
+    data = np.load(path)
+    input_batch = data["input_batch"]
+    target_batch = data["target_batch"]
+    metadata_np = input_batch = data["metadata"]
+    metadata_json = metadata_np.items()
+    metadata = json.loads(metadata_json)
+    return input_batch, target_batch, metadata
 
 
 def main() -> None:

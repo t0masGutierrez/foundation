@@ -77,12 +77,12 @@ def build_domain(
 
 
 def covariance(
-    x: Annotated[jax.Array, "(nx,)"],
-    *,
-    sigma: float = 1.0,
-    ell: float = 1.0,
-    eps: float = 1e-5,
-) -> Annotated[jax.Array, "(nx, nx)"]:
+        x: Annotated[jax.Array, "(nx,)"],
+        *,
+        sigma: float = 1.0,
+        ell: float = 1.0,
+        eps: float = 1e-5
+        ) -> Annotated[jax.Array, "(nx, nx)"]:
     """
     compute the covariance between u(x_i) and u(x_j)
     symmetric: K = K^T
@@ -122,12 +122,12 @@ def covariance(
 
 
 def initialize(
-    x: Annotated[jax.Array, "(nx,)"],
-    L: Annotated[jax.Array, "(nx, nx)"],
-    key: Annotated[jax.Array, "() | (2,)"],
-    *,
-    n: int,
-) -> Annotated[jax.Array, "(n, nx)"]:
+        x: Annotated[jax.Array, "(nx,)"],
+        L: Annotated[jax.Array, "(nx, nx)"],
+        key: Annotated[jax.Array, "() | (2,)"],
+        *,
+        n: int
+        ) -> Annotated[jax.Array, "(n, nx)"]:
     """
     generate initial conditions
 
@@ -158,11 +158,11 @@ def initialize(
 
 
 def sample_coeff(
-    domain: Annotated[Sequence[float], "(2,)"],
-    key: Annotated[jax.Array, "() | (2,)"],
-    *,
-    n: int,
-) -> Annotated[jax.Array, "(n,)"]:
+        domain: Annotated[Sequence[float], "(2,)"],
+        key: Annotated[jax.Array, "() | (2,)"],
+        *,
+        n: int
+        ) -> Annotated[jax.Array, "(n,)"]:
     """
     sample coefficients from uniform probability distribution
 
@@ -184,9 +184,9 @@ def sample_coeff(
 
 
 def flux(
-    u: Annotated[jax.Array, "() | (nx,)"],
-    coeffs: Annotated[jax.Array, "(3,)"],
-) -> Annotated[jax.Array, "() | (nx,)"]:
+        u: Annotated[jax.Array, "() | (nx,)"],
+        coeffs: Annotated[jax.Array, "(3,)"]
+        ) -> Annotated[jax.Array, "() | (nx,)"]:
     """
     compute flux
 
@@ -206,9 +206,9 @@ def flux(
 
 
 def speed(
-    u: Annotated[jax.Array, "() | (nx,)"],
-    coeffs: Annotated[jax.Array, "(3,)"],
-) -> Annotated[jax.Array, "() | (nx,)"]:
+        u: Annotated[jax.Array, "() | (nx,)"],
+        coeffs: Annotated[jax.Array, "(3,)"],
+        ) -> Annotated[jax.Array, "() | (nx,)"]:
     """
     compute speed
 
@@ -229,10 +229,10 @@ def speed(
 
 
 def max_speed(
-    speed: Annotated[jax.Array, "() | (nx,)"],
-    *,
-    eps: float = 1e-8,
-) -> Annotated[jax.Array, "()"]:
+        speed: Annotated[jax.Array, "() | (nx,)"],
+        *,
+        eps: float = 1e-8
+        ) -> Annotated[jax.Array, "()"]:
     """
     compute max speed
 
@@ -244,8 +244,7 @@ def max_speed(
         safety factor for numerical stability
     
     returns
-    ------
-    max_speed
+    -------
         maximum rate of change of position
     """
     max_speed = jnp.max(speed)
@@ -253,12 +252,11 @@ def max_speed(
 
 
 def time_step(
-    x: Annotated[jax.Array, "(nx,)"],
-    dx: float,
-    max_speed: Annotated[jax.Array, "()"],
-    *,
-    cfl: float = 0.5,
-) -> Annotated[jax.Array, "()"]:
+        dx: float,
+        max_speed: Annotated[jax.Array, "()"],
+        *,
+        cfl: float = 0.5
+        ) -> Annotated[jax.Array, "()"]:
     """
     compute time step
 
@@ -272,7 +270,7 @@ def time_step(
         safety factor for limiting the size of time step (courant-friedrachs-lewy)
     
     returns
-    ------
+    -------
     dt
         time step
     """
@@ -280,14 +278,14 @@ def time_step(
 
 
 def neighbor(
-    u: Annotated[jax.Array, "(nx,)"],
-    *,
-    i: int,
-    n: int,
-) -> tuple[
-    Annotated[jax.Array, "()"],
-    Annotated[jax.Array, "()"],
-]:
+        u: Annotated[jax.Array, "(nx,)"],
+        *,
+        i: int,
+        n: int,
+        ) -> tuple[
+            Annotated[jax.Array, "()"],
+            Annotated[jax.Array, "()"]
+            ]:
     """
     compute solution at neighboring spatial coordinate
 
@@ -301,7 +299,7 @@ def neighbor(
         number of neighbors
     
     returns
-    ------
+    -------
     before_sol
         solution before center solution
     after_sol
@@ -315,9 +313,9 @@ def neighbor(
 
 
 def numerical_flux(
-    u: Annotated[jax.Array, "(nx,)"],
-    coeffs: Annotated[jax.Array, "(3,)"],
-) -> Annotated[jax.Array, "(nx,)"]:
+        u: Annotated[jax.Array, "(nx,)"],
+        coeffs: Annotated[jax.Array, "(3,)"]
+        ) -> Annotated[jax.Array, "(nx,)"]:
     """
     compute numerical flux
 
@@ -340,15 +338,15 @@ def numerical_flux(
     for i in range(len(u)):
 
         def create_stencil(
-            u: Annotated[jax.Array, "(nx,)"],
-            *,
-            i: int,
-            side: str,
-        ) -> tuple[
-            Annotated[jax.Array, "(3,)"],
-            Annotated[jax.Array, "(3,)"],
-            Annotated[jax.Array, "(3,)"],
-        ]:
+                u: Annotated[jax.Array, "(nx,)"],
+                *,
+                i: int,
+                side: str
+                ) -> tuple[
+                    Annotated[jax.Array, "(3,)"],
+                    Annotated[jax.Array, "(3,)"],
+                    Annotated[jax.Array, "(3,)"]
+                    ]:
             """
             choose spatial stencil for approximating solution at cell interface \\
             left = {i-2, i-1, i, i+1, i+2} \\
@@ -372,14 +370,14 @@ def numerical_flux(
         right_s0, right_s1, right_s2 = create_stencil(u, i=i, side="right")
 
         def smooth_stencil(
-            s0: Annotated[jax.Array, "(3,)"],
-            s1: Annotated[jax.Array, "(3,)"],
-            s2: Annotated[jax.Array, "(3,)"],
-        ) -> tuple[
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-        ]:
+                s0: Annotated[jax.Array, "(3,)"],
+                s1: Annotated[jax.Array, "(3,)"],
+                s2: Annotated[jax.Array, "(3,)"]
+                ) -> tuple[
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"]
+                    ]:
             """
             compute smoothness of stencil
             """
@@ -398,16 +396,16 @@ def numerical_flux(
         right_beta0, right_beta1, right_beta2 = smooth_stencil(right_s0, right_s1, right_s2)
 
         def weight_stencil(
-            beta0: Annotated[jax.Array, "()"],
-            beta1: Annotated[jax.Array, "()"],
-            beta2: Annotated[jax.Array, "()"],
-            *,
-            eps: float = 1e-6,
-        ) -> tuple[
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-        ]:
+                beta0: Annotated[jax.Array, "()"],
+                beta1: Annotated[jax.Array, "()"],
+                beta2: Annotated[jax.Array, "()"],
+                *,
+                eps: float = 1e-6
+                ) -> tuple[
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"]
+                    ]:
             """
             if smooth stencil then large weight \\
             if rough stencil then small weight
@@ -421,14 +419,14 @@ def numerical_flux(
         right_alpha0, right_alpha1, right_alpha2 = weight_stencil(right_beta0, right_beta1, right_beta2)
 
         def norm_weight(
-            alpha0: Annotated[jax.Array, "()"],
-            alpha1: Annotated[jax.Array, "()"],
-            alpha2: Annotated[jax.Array, "()"],
-        ) -> tuple[
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-        ]:
+                alpha0: Annotated[jax.Array, "()"],
+                alpha1: Annotated[jax.Array, "()"],
+                alpha2: Annotated[jax.Array, "()"]
+                ) -> tuple[
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"]
+                    ]:
             """
             normalize stencil weight
             """
@@ -443,14 +441,14 @@ def numerical_flux(
         )
 
         def approx_sol(
-            s0: Annotated[jax.Array, "(3,)"],
-            s1: Annotated[jax.Array, "(3,)"],
-            s2: Annotated[jax.Array, "(3,)"],
-        ) -> tuple[
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"],
-        ]:
+                s0: Annotated[jax.Array, "(3,)"],
+                s1: Annotated[jax.Array, "(3,)"],
+                s2: Annotated[jax.Array, "(3,)"]
+                ) -> tuple[
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"],
+                    Annotated[jax.Array, "()"]
+                    ]:
             """
             approximate solution at cell interface using Lagrange interpolation \\
             q \\approx u(x_{i+0.5})
@@ -487,9 +485,9 @@ def numerical_flux(
 
 
 def rhs(
-    num_flux: Annotated[jax.Array, "(nx,)"],
-    dx: float,
-) -> Annotated[jax.Array, "(nx,)"]:
+        num_flux: Annotated[jax.Array, "(nx,)"],
+        dx: float
+        ) -> Annotated[jax.Array, "(nx,)"]:
     """
     compute right hand side of equation \\
     du/dt = -df(u)/dx
@@ -513,10 +511,10 @@ def rhs(
 
 
 def rk4_step(
-    u: Annotated[jax.Array, "(nx,)"],
-    dx: float,
-    dt: float,
-) -> Annotated[jax.Array, "(nx,)"]:
+        u: Annotated[jax.Array, "(nx,)"],
+        dx: float,
+        dt: float
+        ) -> Annotated[jax.Array, "(nx,)"]:
     """
     approximate solution at next time step using 4th order runge-kutta
 
@@ -543,11 +541,11 @@ def rk4_step(
 
 
 def rk4_evolve(
-    u: Annotated[jax.Array, "(nx,)"],
-    t: Annotated[jax.Array, "(nt,)"],
-    dx: float,
-    dt: float,
-) -> Annotated[jax.Array, "(nt, nx)"]:
+        u: Annotated[jax.Array, "(nx,)"],
+        t: Annotated[jax.Array, "(nt,)"],
+        dx: float,
+        dt: float
+        ) -> Annotated[jax.Array, "(nt, nx)"]:
     """
     evolve approximate solution through time using repeated RK4 steps
 
@@ -580,10 +578,10 @@ def rk4_evolve(
 
 
 def demonstrate(
-    trajs: Annotated[jax.Array, "(nt, nx)"],
-    *,
-    n: int,
-) -> Annotated[jax.Array, "(num_examples, 2, nx)"]:
+        trajs: Annotated[jax.Array, "(nt, nx)"],
+        *,
+        n: int
+        ) -> Annotated[jax.Array, "(num_examples, 2, nx)"]:
     """
     create (input, target) examples
 
