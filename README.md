@@ -51,10 +51,10 @@ The model predicts the future state of query trajectory using set of context tra
 
 $$
 \mathcal{T}_{\theta}: 
-\bigl(
+\left(
 u_q(t,x),
 \{u_i(t,x),\,u_i(t+\tau,x)\}_{i=1}^{k}
-\bigr)
+\right)
 \longmapsto
 \hat{u}_q(t+\tau,x).
 $$
@@ -106,7 +106,7 @@ $$
 R_{f,\tau}:
 u(t+\tau,x)
 \longmapsto
-\bigl\{\,v \mid F_{f,\tau}(v)=u(t+\tau,x)\,\bigr\}.
+\{\,v \mid F_{f,\tau}(v)=u(t+\tau,x)\,\}.
 $$
 
 ### Notation
