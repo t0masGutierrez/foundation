@@ -1,14 +1,14 @@
 from __future__ import annotations
 from typing import Annotated, Any, Sequence, Tuple
 import yaml
+import json
 import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.random as jr
-from jax import jit
-import json
+import jax.lax as lax
 from pathlib import Path
-import sympy as sp
+import plot
 
 
 def load_config(
@@ -48,8 +48,7 @@ def get_device(
     devs
         availabled JAX devices
     """
-    device = config["experiment"].get("device") or "auto"
-    device = str(device).lower()
+    device = str(config["experiment"].get("device") or "auto").lower()
     platform = {
         "auto": None,
         "cpu": "cpu",
@@ -113,7 +112,6 @@ def build_domain(
     min = config["space"]["axis"]["x"]["min"]
     max = config["space"]["axis"]["x"]["max"]
     n = config["space"]["axis"]["x"]["n"]
-    periodic = config["space"]["axis"]["x"]["periodic"]
     x = jnp.linspace(min, max, n, endpoint=False)
 
     # temporal domain
@@ -139,11 +137,11 @@ def covariance(
     parameters
     ----------
     x
-        spatial coordinate array
+        spatial coordinates
     sigma
         standard deviation
     ell
-        speed of correlation decay
+        correlation length
     eps
         safety factor for numerical stability
 
@@ -335,41 +333,7 @@ def time_step(
     return cfl * dx / max_speed
 
 
-def neighbor(
-        u: Annotated[jax.Array, "(nx,)"],
-        *,
-        i: int,
-        n: int,
-        ) -> Tuple[
-            Annotated[jax.Array, "()"],
-            Annotated[jax.Array, "()"]
-            ]:
-    """
-    compute solution at neighboring spatial coordinate
-
-    parameters
-    ----------
-    u
-        solution
-    i
-        index of center solution
-    n
-        number of neighbors
-    
-    returns
-    -------
-    before_sol
-        solution before center solution
-    after_sol
-        solution after center solution
-    """
-    before_index = (i - n) % len(u)
-    after_index = (i + n) % len(u)
-    before_sol = u[before_index]
-    after_sol = u[after_index]
-    return before_sol, after_sol
-
-
+@jax.jit
 def numerical_flux(
         u: Annotated[jax.Array, "(nx,)"],
         coeffs: Annotated[jax.Array, "(3,)"]
@@ -471,9 +435,7 @@ def numerical_flux(
         return omega0, omega1, omega2
 
     left_omega0, left_omega1, left_omega2 = norm_weight(left_alpha0, left_alpha1, left_alpha2)
-    right_omega0, right_omega1, right_omega2 = norm_weight(
-        right_alpha0, right_alpha1, right_alpha2
-    )
+    right_omega0, right_omega1, right_omega2 = norm_weight(right_alpha0, right_alpha1, right_alpha2)
 
     def approx_sol(
             s0: Annotated[jax.Array, "(3,)"],
@@ -565,17 +527,18 @@ def rk4_step(
 
     returns
     -------
-    u_dt
-        solution differential between time step
+    u_next
+        solution at next time step
     """
     k1 = divergence(u, coeffs, dx)
     k2 = divergence(u + k1 * dt / 2, coeffs, dx)
     k3 = divergence(u + k2 * dt / 2, coeffs, dx)
     k4 = divergence(u + k3 * dt, coeffs, dx)
-    u_dt = dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
-    return u_dt
+    u_next = u + dt / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+    return u_next
 
 
+@jax.jit
 def rk4_evolve(
         u: Annotated[jax.Array, "(nx,)"],
         coeffs: Annotated[jax.Array, "(n,)"],
@@ -592,10 +555,8 @@ def rk4_evolve(
         solution
     coeffs
         coefficients
-    num_flux
-        numerical flux
     t
-        temporal coordinates
+        time
     dx
         grid spacing
     dt
@@ -606,15 +567,17 @@ def rk4_evolve(
     trajs
         solution trajectories
     """
-    max_time = float(t[-1])
-    time = float(t[0])
-    trajs = list()
-    while time < max_time:
-        trajs.append(u)
-        u_dt = rk4_step(u, coeffs, dx, dt)
-        u += u_dt
-        time += dt
-    trajs = jnp.array(trajs)
+    def step(
+            u,
+            _
+            ) -> Tuple[
+              Annotated[jax.Array, "(nx,)"],
+              Annotated[jax.Array, "(nx,)"]
+            ]:
+        u_next = rk4_step(u, coeffs, dx, dt)
+        return u_next, u
+    
+    _, trajs = lax.scan(step, u, xs=None, length=len(t))
     return trajs
 
 
@@ -904,23 +867,24 @@ def build_chunk(
                            n=config["pde"]["parameters"]["coefficient_distribution"]["n"])
     v = speed(u, coeffs)
     max_v = max_speed(v)
-    xmin = x[0]
-    xmax = x[-1]
-    nx = len(x)
-    dx = float(x[1] - x[0]) / nx
+    dx = float(x[1] - x[0])
     dt = time_step(dx, max_v)
+    u_tau = rk4_step(u, coeffs, dx, dt)
     trajs = rk4_evolve(u, coeffs, t, dx, dt)
+    init_plot = plot.plot_init(x, u)
+    step_plot = plot.plot_step(x, u, u_tau)
+    traj_plot = plot.plot_traj(x, t, trajs)
     examples = demonstrate(trajs, n=config["dataset"]["horizon"])
     key, input_batch, target_batch = batch_task(x, examples, key,
                                            n=config["dataset"]["num_tasks"],
                                            k=config["dataset"]["num_context"])
-    chunk_path = save_task(f"/Users/tgut03/GitHub/foundation/data/task{id}.npz", input_batch, target_batch, config)
+    chunk_path = save_task(f"/Users/tgut03/GitHub/FiniteFluxNet/data/task{id}.npz", input_batch, target_batch, config)
     input_batch, target_batch, config = load_task(chunk_path)
     return key, chunk_path
 
 
 def build_dataset(
-        cfg_path: str,
+        path: str,
         key: Annotated[jax.Array, "() | (2,)"],
         *,
         n: int
@@ -933,7 +897,7 @@ def build_dataset(
 
     parameters
     ----------
-    cfg_path
+    path
         path to the configuration file
     key
         random number generator
@@ -947,19 +911,18 @@ def build_dataset(
     config
         configuration object containing experiment, space, time, pde, initial_condition, boundary_condition, solver, dataset, model, training, evaluation, and logging settings
     """
-    config = load_config(cfg_path)
+    config = load_config(path)
     for id in range(n):
         key, subkey = jr.split(key)
-        key, chunk_path = build_chunk(cfg_path, id, subkey)
+        key, chunk_path = build_chunk(path, id, subkey)
     return key, config
 
 
 def main() -> None:
-    cfg_path = str(Path(__file__).resolve().parents[1] / "config" / "cubic.yaml")
-    config = load_config(cfg_path)
-    device = get_device(config)
+    path = str(Path(__file__).resolve().parents[1] / "configs" / "cubic.yaml")
+    config = load_config(path)
     key = jr.key(config["experiment"]["seed"])
-    key, config = build_dataset(cfg_path, key, n=2)
+    key, config = build_dataset(path, key, n=1)
     print(key)
     print(config)
 
