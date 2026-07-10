@@ -31,7 +31,7 @@ $$
 k(x,x') =
 \sigma^2
 \exp\biggl(
--\frac{1-\cos\!\bigl(2\pi(x-x'))}
+-\frac{1-\cos(2\pi(x-x'))}
 {\ell^2}
 \biggr).
 $$
